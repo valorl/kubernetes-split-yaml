@@ -161,7 +161,7 @@ func runTest(t *testing.T, in, out string) {
 		}
 		defer os.RemoveAll(outDir)
 
-		handleFile(in, outDir, TemplateFlat, &Filters{})
+		handleFile(in, outDir, TemplateFlat, &Filters{}, 0755, 0644)
 
 		wantFiles, err := filepath.Glob(filepath.Join(out, "*"))
 		if err != nil {
@@ -188,6 +188,12 @@ func runTest(t *testing.T, in, out string) {
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf(fileName + "\n" + cmp.Diff(string(got), string(want)))
 			}
+
+			fi, _ := os.Stat(generatedFileName)
+			if fi.Mode() != 0644 {
+				t.Errorf("unexpected permissions for file: %s", fileName)
+			}
+
 		}
 	})
 }

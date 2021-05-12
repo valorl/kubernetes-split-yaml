@@ -3,6 +3,7 @@ package main
 import (
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 
 	"bytes"
 	"fmt"
@@ -75,6 +76,16 @@ var appFlags = []cli.Flag{
 		Value: FileRe,
 		Usage: "final output file regex to match",
 	},
+	&cli.StringFlag{
+		Name:  "file_mode",
+		Value: "0644",
+		Usage: "unix permissions for generated files",
+	},
+	&cli.StringFlag{
+		Name:  "dir_mode",
+		Value: "0755",
+		Usage: "unix permissions for output directory",
+	},
 }
 
 type Filters struct {
@@ -101,7 +112,16 @@ func main() {
 			filename:  c.String("file_re"),
 		}
 
-		handleFile(c.Args().Get(0), outdir, outfileTemplate, filters)
+		dirMode, err := strconv.ParseUint(c.String("dir_mode"), 8, 32)
+		if err != nil {
+			log.Fatalf("Couldn't parse --dir_mode: %v", err)
+		}
+		fileMode, err := strconv.ParseUint(c.String("file_mode"), 8, 32)
+		if err != nil {
+			log.Fatalf("Couldn't parse --file_mode: %v", err)
+		}
+
+		handleFile(c.Args().Get(0), outdir, outfileTemplate, filters, os.FileMode(dirMode), os.FileMode(fileMode))
 		return nil
 	}
 
@@ -163,8 +183,7 @@ func outFile(outdir string, t *template.Template, filters *Filters, m *Kubernete
 	return filename, nil
 }
 
-func handleFile(file, outdir, outfileTemplate string, filters *Filters) {
-
+func handleFile(file, outdir, outfileTemplate string, filters *Filters, dirMode, fileMode os.FileMode) {
 	tpl, err := template.New("outfile").Parse(outfileTemplate)
 	if err != nil {
 		log.Fatalf("Failed create template from '%s'", outfileTemplate)
@@ -190,12 +209,12 @@ func handleFile(file, outdir, outfileTemplate string, filters *Filters) {
 
 		log.Infof("Creating file: %s", filename)
 		fileDir := filepath.Dir(filename)
-		err = os.MkdirAll(fileDir, os.ModePerm)
+		err = os.MkdirAll(fileDir, dirMode)
 		if err != nil {
 			log.Fatalf("Failed to create directory '%s'", fileDir)
 		}
 
-		err = ioutil.WriteFile(filename, []byte(fileContent), os.ModePerm)
+		err = ioutil.WriteFile(filename, []byte(fileContent), fileMode)
 		if err != nil {
 			log.Fatalf("Failed creating file %s : %v", filename, err)
 		}
